@@ -1,0 +1,3 @@
+### POST request to example server
+POST http://127.0.0.1:8801/api/v1/robot-cells/sensor-data?token=a6351cec-6f32-4e4d-a802-69e46add4b55f3066094-5f04-4619-8870-05455bd3fe1e
+###
