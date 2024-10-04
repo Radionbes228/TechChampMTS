@@ -3,52 +3,145 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.logging.Logger;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class Robot1 {
+    static int sideWorldReversSide = 0;
+    
     public static void main(String[] args) {
         ConnectRobot connectRobot = new ConnectRobot();
         ConnectSensorData connectSensorData = new  ConnectSensorData();
-//        Cell[][] matrix = new Cell[16][16];
-//
-//
-//
-//
-//        int xAbscissa = 16;
-//        int yOrdinate = 1;
+        Cell[] matrix = new Cell[256];
+
+//        int xAbscissa = 15;
+//        int yOrdinate = 0;
+
+//        Float offsetX;
+//        Float offsetY;
 
 
+
+        int oneWallCount = 1;
+        int twoParallelWall = 9;
+        int twoFusedWall = 5;
+        int threeFusedWall = 11;
 
         SensorData sensorData;
         while (true) {
             sensorData = connectSensorData.getSensorData();
             if (isRevers(sensorData)) {
+                System.out.println(getCellType(isCellType(sensorData)));
+                if (sideWorldReversSide == 3) sideWorldReversSide = 1;
+                else if (sideWorldReversSide == 2) sideWorldReversSide = 0;
+                else if (sideWorldReversSide == 1) sideWorldReversSide = 3;
+                else if (sideWorldReversSide == 0) sideWorldReversSide = 2;
                 connectRobot.right();
                 connectRobot.right();
+                connectRobot.forward();
             } else if (isLeft(sensorData)) {
+                System.out.println(getCellType(isCellType(sensorData)));
+                if (sideWorldReversSide <= 3 && sideWorldReversSide >= 1) sideWorldReversSide--;
+                else if (sideWorldReversSide == 0) sideWorldReversSide = 3;
                 connectRobot.left();
                 connectRobot.forward();
             } else if (isForward(sensorData)) {
+                System.out.println(getCellType(isCellType(sensorData)));
                 connectRobot.forward();
             } else if (isRight(sensorData)) {
+                System.out.println(getCellType(isCellType(sensorData)));
+                if (sideWorldReversSide >= 0 && sideWorldReversSide <= 2) sideWorldReversSide++;
+                else if (sideWorldReversSide == 3) sideWorldReversSide = 0;
                 connectRobot.right();
                 connectRobot.forward();
             }
         }
     }
 
+
+    // Почти решенная проблема !!!!!!!! НИ В КОЕМ СЛУЧАЕ НЕ УДАЛАЯТЬ РЕШЕНИЕ !!!!!!!!!! ВСПОМНИ РЕШЕНИЕ ПРИДУРОК!!!
+    public static int getCellType(int actualType) {
+        if (sideWorldReversSide == 1 || sideWorldReversSide == 3) {
+            if (actualType == 9 || actualType == 10) {
+                return actualType + 1;
+            } else if (actualType >= 11 && actualType <= 14) {
+                if (sideWorldReversSide == 1) return actualType - 1;
+                else return actualType + 1;
+            } else if (actualType >= 5 && actualType <= 8) {
+                if (actualType == 7 && sideWorldReversSide == 3) return actualType + 1;
+                else if (sideWorldReversSide == 3) return actualType - 3;
+                else return actualType - sideWorldReversSide;
+            } else if (actualType >= 1 && actualType <= 4) {
+                if (sideWorldReversSide == 1) return actualType + 1;
+                else if (actualType == 1) return actualType + sideWorldReversSide;
+                else return actualType - 1;
+            } else return actualType;
+        } else if (sideWorldReversSide == 2) {
+            if (actualType >= 11 && actualType <= 14) {
+                return actualType + sideWorldReversSide;
+            } else if (actualType >= 5 && actualType <= 8) {
+                return actualType - sideWorldReversSide;
+            } else if (actualType >= 1 && actualType <= 4) {
+                return actualType + sideWorldReversSide;
+            } else return actualType;
+        } else return actualType;
+    }
+
+/*    public static int getCellType(int actualType) {
+        if (sideWorldReversSide == 1 || sideWorldReversSide == 3) {
+            if (actualType == 9 || actualType == 10) {
+                return actualType + 1;
+            } else if (actualType >= 11 && actualType <= 14) {
+                if (sideWorldReversSide == 1) return actualType - 1;
+                else return actualType + 1;
+            } else if (actualType >= 5 && actualType <= 8) {
+                if (actualType == 7 && sideWorldReversSide == 3) return actualType + 1;
+                else if (sideWorldReversSide == 3) return actualType - 3;
+                else return actualType - sideWorldReversSide;
+            } else if (actualType >= 1 && actualType <= 4) {
+                if (sideWorldReversSide == 1) return actualType + 1;
+                else if (actualType == 1) return actualType + sideWorldReversSide;
+                else return actualType - 1;
+            } else return actualType;
+        } else if (sideWorldReversSide == 2) {
+            if (actualType >= 11 && actualType <= 14) {
+                return actualType + sideWorldReversSide;
+            } else if (actualType >= 5 && actualType <= 8) {
+                return actualType - sideWorldReversSide;
+            } else if (actualType >= 1 && actualType <= 4) {
+                return actualType + sideWorldReversSide;
+            } else return actualType;
+        } else return actualType;
+    }*/
+
+    public static int isCellType(SensorData sensorData) {
+        if (isWall15(sensorData)) return 15;
+        else if (isWall14(sensorData)) return 14;
+        else if (isWall13(sensorData)) return 13;
+        else if (isWall12(sensorData)) return 12;
+        else if (isWall11(sensorData)) return 11;
+        else if (isWall10(sensorData)) return 10;
+        else if (isWall9(sensorData)) return 9;
+        else if (isWall8(sensorData)) return 8;
+        else if (isWall7(sensorData)) return 7;
+        else if (isWall6(sensorData)) return 6;
+        else if (isWall5(sensorData)) return 5;
+        else if (isWall4(sensorData)) return 4;
+        else if (isWall3(sensorData)) return 3;
+        else if (isWall2(sensorData)) return 2;
+        else if (isWall1(sensorData)) return 1;
+        else return 0;
+    }
+
+    //Good
     private static boolean isRevers(SensorData sensorData) {
         return (sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL) && (sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL) && (sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL);
     }
-
     private static boolean isRight(SensorData sensorData) {
         return (sensorData.front_distance < SensorData.DISTANCE_OPEN_CELL && sensorData.left_side_distance < SensorData.DISTANCE_OPEN_CELL);
     }
-
     private static boolean isLeft(SensorData sensorData) {
         if ((sensorData.front_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.front_distance < SensorData.DISTANCE_OPEN_CELL)
                 && (sensorData.left_side_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.left_side_distance < SensorData.DISTANCE_OPEN_CELL)
@@ -63,12 +156,76 @@ public class Robot1 {
             return true;
         } else return sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL;
     }
-
     private static boolean isForward(SensorData sensorData) {
         if (sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL) {
             return true;
         }else return (sensorData.front_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.front_distance < SensorData.DISTANCE_OPEN_CELL)
                 && (sensorData.right_side_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.right_side_distance < SensorData.DISTANCE_OPEN_CELL);
+    }
+    // Good
+    private static boolean isWall0(SensorData sensorData){
+        return (sensorData.right_side_distance < SensorData.DISTANCE_OPEN_CELL && sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL)
+                && (sensorData.left_side_distance < SensorData.DISTANCE_OPEN_CELL && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL)
+                && (sensorData.front_distance < SensorData.DISTANCE_OPEN_CELL && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL)
+                && (sensorData.back_distance < SensorData.DISTANCE_OPEN_CELL && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL);
+    }
+    private static boolean isWall1(SensorData sensorData){
+        return (sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL);
+    }
+    private static boolean isWall2(SensorData sensorData){
+        return (sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL);
+    }
+    private static boolean isWall3(SensorData sensorData){
+        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall4(SensorData sensorData){
+        return sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall5(SensorData sensorData){
+        return sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall6(SensorData sensorData){
+        return (sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL);
+    }
+    private static boolean isWall7(SensorData sensorData){
+        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall8(SensorData sensorData){
+        return sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL;
+
+
+    }
+    private static boolean isWall9(SensorData sensorData){
+        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall10(SensorData sensorData){
+        return sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall11(SensorData sensorData){
+        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall12(SensorData sensorData){
+        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall13(SensorData sensorData){
+        return sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall14(SensorData sensorData){
+        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
+    }
+    private static boolean isWall15(SensorData sensorData){
+        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL
+                && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
     }
 
 
@@ -142,7 +299,6 @@ public class Robot1 {
             return client.send(request, HttpResponse.BodyHandlers.ofString());
         }
     }
-
     public static class ConnectSensorData{
         private static final String SENSOR_DATA_ENDPOINT = "/robot-cells/sensor-data";
         private static final ConnectRobot connectRobot = new ConnectRobot();
@@ -190,10 +346,13 @@ public class Robot1 {
             return jsonNode.get(param).floatValue();
         }
     }
-
     public static final class SensorData {
         private static final Float DISTANCE_NEAREST_CELL = 65F;
         private static final Float DISTANCE_OPEN_CELL = 2000F;
+        private static final Float POSITION_RELATIVE_NORTH = 3F;
+        private static final Float POSITION_RELATIVE_SOUTH = 3F;
+        private static final Float POSITION_RELATIVE_WEST = 3F;
+        private static final Float POSITION_RELATIVE_EAST = 3F;
 
         private final Float front_distance;
         private final Float right_side_distance;
@@ -204,8 +363,8 @@ public class Robot1 {
         private final Float rotation_pitch;
         private final Float rotation_yaw;
         private final Float rotation_roll;
-        private final Float down_x_offset;
-        private final Float down_y_offset;
+        private Float down_x_offset;
+        private Float down_y_offset;
 
         public SensorData(Float front_distance, Float right_side_distance, Float left_side_distance,
                           Float back_distance, Float left_45_distance, Float right_45_distance, Float rotation_pitch,
@@ -262,30 +421,19 @@ public class Robot1 {
                     "down_y_offset=" + down_y_offset + ']';
         }*/
     }
-
     public static class Cell{
         private boolean isBeen = false;
-        private int XAbscissa = 0;
-        private int YOrdinate = 0;
+        private int XAbscissa;
+        private int YOrdinate;
+        private int type;
+        private EnumLastAction lastAction;
 
-        public int YOrdinate() {
-            return YOrdinate;
-        }
-
-        public void setYOrdinate(int YOrdinate) {
-            this.YOrdinate = YOrdinate;
-        }
-
-        public int XAbscissa() {
-            return XAbscissa;
-        }
-
-        public void setXAbscissa(int XAbscissa) {
-            this.XAbscissa = XAbscissa;
+        enum EnumLastAction{
+            FORWARD, BACKWARD, LEFT, RIGHT
         }
     }
-
     public static class CellType{
+        private static final int TYPE_0 = 0;
         private static final int TYPE_1 = 1;
         private static final int TYPE_2 = 2;
         private static final int TYPE_3 = 3;
@@ -302,8 +450,10 @@ public class Robot1 {
         private static final int TYPE_14 = 14;
         private static final int TYPE_15 = 15;
     }
-
     public enum HttpStatus{
         OK, VALID_ERROR
+    }
+    public enum SideWorld {
+        NORTH, SOUTH, EAST, WEST
     }
 }
