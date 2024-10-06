@@ -1,7 +1,5 @@
-import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -28,7 +26,6 @@ public class Robot1 {
             int actualType = isActualCellType(sensorData);
             createCell(actualType);
 
-
             if (actualType == 12) {
                 sideWorldReversSide = (sideWorldReversSide + 2) % 4;
                 connectRobot.right();
@@ -47,14 +44,11 @@ public class Robot1 {
             }
             setPosition();
         }
+
         for (Cell cell : typeCell) {
             matrix[cell.XAbscissa][cell.YOrdinate] = cell.type;
         }
-        sendMatrix(matrix);
-    }
-
-    private static void sendMatrix(int[][] matrix) throws IOException {
-        connectRobot.sendMatrix(matrix);
+        connectRobot.sendMatrix();
     }
 
     public static void setPosition() {
@@ -65,15 +59,12 @@ public class Robot1 {
     }
 
     public static void createCell(int cellType) {
-        short existingCell = (short) typeCell.stream()
+        Cell existingCell = typeCell.stream()
                 .filter(cell -> cell.XAbscissa == xAbscissa && cell.YOrdinate == yOrdinate)
-                .count();
-        if (existingCell == 0) {
-            Cell cell = new Cell();
-            cell.isBeen = true;
-            cell.type = getCellType(cellType);
-            cell.YOrdinate = yOrdinate;
-            cell.XAbscissa = xAbscissa;
+                .findFirst()
+                .orElse(null);
+        if (existingCell == null) {
+            Cell cell = new Cell(xAbscissa, yOrdinate, getCellType(cellType));
             typeCell.add(cell);
         }
     }
@@ -177,7 +168,7 @@ public class Robot1 {
                     .build();
         }
 
-        public void sendMatrix(int[][] matrix) throws IOException {
+        public void sendMatrix() throws IOException {
             Request request = createRequestMovePOST(SEND_MATRIX);
             try (Response response = client.newCall(request).execute()) {
                 assert response.body() != null;
@@ -248,9 +239,31 @@ public class Robot1 {
         public static final float DISTANCE_NEAREST_CELL = 65F;
     }
     public static class Cell {
-        public boolean isBeen = false;
         public int XAbscissa;
         public int YOrdinate;
         public int type;
+
+        public Cell(int XAbscissa, int YOrdinate, int type) {
+            this.XAbscissa = XAbscissa;
+            this.YOrdinate = YOrdinate;
+            this.type = type;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            Cell cell = (Cell) o;
+            return XAbscissa == cell.XAbscissa && YOrdinate == cell.YOrdinate && type == cell.type;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = XAbscissa;
+            result = 31 * result + YOrdinate;
+            result = 31 * result + type;
+            return result;
+        }
     }
 }
