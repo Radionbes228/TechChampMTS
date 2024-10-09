@@ -7,11 +7,20 @@ import okhttp3.*;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+// TODO: не изменяй пока не будешь в нормальном состоянии
 
-public class Robot2R {
+
+public class Robot2Rresult {
     static int sideWorldReversSide = 0;
+
     static int xAbscissa = 15;
     static int yOrdinate = 0;
+
+    static int xAbscissaParent = 15;
+    static int yOrdinateParent = 0;
+
+    static int delayDefault = 20;
+    static int delay = 40;
 
     static Set<FinishCell> finishMatrix = new HashSet<>();
     static {
@@ -22,6 +31,7 @@ public class Robot2R {
     }
 
     static List<Action> stepToFinish = new LinkedList<>();
+    static List<Cell> stopList = new ArrayList<>();
 
     static boolean isFindFinish = false;
 
@@ -33,10 +43,9 @@ public class Robot2R {
 
     public static void main(String[] args) throws java.lang.Exception{
         Cell cell = new Cell();
+        cell.parent = null;
         cell.XAbscissa = xAbscissa;
         cell.YOrdinate = yOrdinate;
-        cell.parent = null;
-        path.add(cell);
 
         sensorData = ConnectSensorData.getSensorData();
         int actualType = isActualCellType(sensorData);
@@ -66,10 +75,38 @@ public class Robot2R {
             connectRobot.forward();
         }
         setPosition();
+        path.add(cell);
+        xAbscissaParent = cell.XAbscissa;
+        yOrdinateParent = cell.YOrdinate;
+
 
 
         while (!isFindFinish) {
-            moveRobot();
+            if (isWas(xAbscissa, yOrdinate)){
+                sensorData = ConnectSensorData.getSensorData();
+                int actualCellType = isActualCellType(sensorData);
+
+                if (actualCellType == 12) {
+                    sideWorldReversSide = (sideWorldReversSide + 2) % 4;
+                    connectRobot.right();
+                    connectRobot.right();
+                    connectRobot.forward();
+                } else if (actualCellType == 0 || (actualCellType >= 2 && actualCellType <= 4) || actualCellType == 7) {
+                    sideWorldReversSide = (sideWorldReversSide - 1 + 4) % 4;
+                    connectRobot.left();
+                    connectRobot.forward();
+                } else if (actualCellType == 14 || actualCellType == 1 || actualCellType == 9 || actualCellType == 5) {
+                    connectRobot.forward();
+                } else if (actualCellType == 8 || actualCellType == 13) {
+                    sideWorldReversSide = (sideWorldReversSide + 1) % 4;
+                    connectRobot.right();
+                    connectRobot.forward();
+                }
+                xAbscissaParent = xAbscissa;
+                yOrdinateParent = yOrdinate;
+                setPosition();
+            }
+            else moveRobot();
         }
         moveRobotToFinish();
     }
@@ -78,25 +115,26 @@ public class Robot2R {
         sensorData = ConnectSensorData.getSensorData();
         int actualType = isActualCellType(sensorData);
         Cell cell = new Cell();
-
+        cell.XAbscissa = xAbscissa;
+        cell.YOrdinate = yOrdinate;
         if (actualType == 12) {
+            sideWorldReversSide = (sideWorldReversSide + 2) % 4;
             cell.action.push(Action.FORWARD);
             cell.action.push(Action.RIGHT);
             cell.action.push(Action.RIGHT);
-            cell.redFlag = true;
-            sideWorldReversSide = (sideWorldReversSide + 2) % 4;
+            cell.isDeadEnd = true;
             connectRobot.right();
             connectRobot.right();
             connectRobot.forward();
         } else if (actualType == 0 || (actualType >= 2 && actualType <= 4) || actualType == 7) {
-            if (isFork(actualType)) cell.forkFlag = true;
+            if (isFork(actualType)) cell.isFork = true;
             cell.action.push(Action.FORWARD);
             cell.action.push(Action.LEFT);
             sideWorldReversSide = (sideWorldReversSide - 1 + 4) % 4;
             connectRobot.left();
             connectRobot.forward();
         } else if (actualType == 14 || actualType == 1 || actualType == 9 || actualType == 5) {
-            if (isFork(actualType)) cell.forkFlag = true;
+            if (isFork(actualType)) cell.isFork = true;
             cell.action.push(Action.FORWARD);
             connectRobot.forward();
         } else if (actualType == 8 || actualType == 13) {
@@ -106,11 +144,20 @@ public class Robot2R {
             connectRobot.right();
             connectRobot.forward();
         }
-        setPosition();
-        cell.XAbscissa = xAbscissa;
-        cell.YOrdinate = yOrdinate;
         setParent(cell);
+        setPosition();
+        path.add(cell);
+        xAbscissaParent = cell.XAbscissa;
+        yOrdinateParent = cell.YOrdinate;
         isFinish();
+    }
+
+    public static boolean isWas(int x, int y){
+        return path.stream().anyMatch(cell -> cell.XAbscissa == x && cell.YOrdinate == y);
+    }
+
+    public static boolean isFork(int actualType){
+        return actualType >= 0 && actualType <= 3;
     }
 
     public static void isFinish() throws IOException, InterruptedException {
@@ -120,19 +167,13 @@ public class Robot2R {
                 sideWorldReversSide = 0;
                 xAbscissa = 15;
                 yOrdinate = 0;
+                Thread.sleep(3000);
                 connectRobot.restart();
                 Thread.sleep(2000);
                 break;
             }
         }
     }
-
-
-    public static boolean isFork(int actualType) throws IOException, InterruptedException {
-        return actualType >= 0 && actualType <= 3;
-    }
-
-
 
     public static void setPosition() {
         if (sideWorldReversSide == 0) xAbscissa--;
@@ -142,25 +183,34 @@ public class Robot2R {
     }
 
     public static void moveRobotToFinish() throws IOException, InterruptedException {
+
         for (Cell cell : path) {
             Stack<Action> step = cell.action;
             stepToFinish.addAll(step);
         }
         for (int i = 0; i < 2; i++) {
             for (Action action: stepToFinish) {
-                if (action == Action.FORWARD) connectRobot.forward();
-                else if (action == Action.RIGHT) connectRobot.right();
-                else if (action == Action.LEFT) connectRobot.left();
+                if (action == Action.FORWARD) {
+                    connectRobot.forward();
+                    Thread.sleep(delay);
+                }
+                else if (action == Action.RIGHT) {
+                    connectRobot.right();
+                    Thread.sleep(delay);
+                }
+                else if (action == Action.LEFT) {
+                    Thread.sleep(delay);
+                    connectRobot.left();
+                }
             }
             connectRobot.forward();
-            Thread.sleep(2000);
+            Thread.sleep(1000);
             connectRobot.restart();
         }
     }
 
     public static void setParent(Cell cell) {
-        cell.parent = path.get(path.size() - 1);
-        path.add(cell);
+        cell.parent = path.stream().filter(el -> el.XAbscissa == xAbscissaParent && el.YOrdinate == yOrdinateParent).findFirst().orElse(null);
     }
     private static int isActualCellType(SensorData sensorData) {
         boolean[] walls = new boolean[4];
@@ -204,24 +254,24 @@ public class Robot2R {
                     .build();
         }
 
-        public OkHttpClient getOkHttpClient(){
-            return client;
-        }
-
-        public void right() throws IOException {
+        public void right() throws IOException, InterruptedException {
             requestSend(RIGHT);
+            Thread.sleep(delayDefault);
         }
 
-        public void left() throws IOException {
+        public void left() throws IOException, InterruptedException {
             requestSend(LEFT);
+            Thread.sleep(delayDefault);
         }
 
-        public void forward() throws IOException {
+        public void forward() throws IOException, InterruptedException {
             requestSend(FORWARD);
+            Thread.sleep(delayDefault);
         }
 
-        public void restart() throws IOException {
+        public void restart() throws IOException, InterruptedException {
             requestSend(RESTART);
+            Thread.sleep(delayDefault);
         }
 
         private void requestSend(String action) throws IOException {
@@ -249,7 +299,8 @@ public class Robot2R {
                     .build();
         }
 
-        public static SensorData getSensorData() {
+        public static SensorData getSensorData() throws InterruptedException {
+            Thread.sleep(delayDefault);
             try (Response response = client.newCall(createRequestMoveGET(SENSOR_DATA_ENDPOINT)).execute()) {
                 assert response.body() != null;
                 JsonNode jsonNode = objectMapper.readTree(response.body().string());
@@ -284,38 +335,12 @@ public class Robot2R {
     public static class Cell {
         public int XAbscissa;
         public int YOrdinate;
+        public int score = 0;
         public Stack<Action> action = new Stack<>();
         public Cell parent;
-        public boolean redFlag = false;
-        public boolean greenFlag = false;
-        public boolean forkFlag = false;
-
         public Cell(){}
-
-        public Cell(int XAbscissa, int YOrdinate, Stack<Action> action, Cell parent) {
-            this.XAbscissa = XAbscissa;
-            this.YOrdinate = YOrdinate;
-            this.action = action;
-            this.parent = parent;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            Cell cell = (Cell) o;
-            return XAbscissa == cell.XAbscissa && YOrdinate == cell.YOrdinate && Objects.equals(action, cell.action) && Objects.equals(parent, cell.parent);
-        }
-
-        @Override
-        public int hashCode() {
-            int result = XAbscissa;
-            result = 31 * result + YOrdinate;
-            result = 31 * result + Objects.hashCode(action);
-            result = 31 * result + Objects.hashCode(parent);
-            return result;
-        }
+        boolean isFork;
+        boolean isDeadEnd;
     }
     public static class FinishCell{
         int x;
@@ -345,4 +370,34 @@ public class Robot2R {
     public enum Action{
         FORWARD, RIGHT, LEFT
     }
+
+    /*public static void findPath(Cell start, FinishCell finish, Cell[][] grid) {
+        // Создаем очередь приоритета для хранения ячеек, которые нужно обработать
+        PriorityQueue<Cell> queue = new PriorityQueue<>();
+
+        // Создаем множество для отслеживания посещенных ячеек
+        Set<Cell> visited = new HashSet<>();
+
+        // Инициализируем стартовую ячейку
+        start.score = 0;
+        start.parent = null;
+        queue.add(start);
+
+        while (!queue.isEmpty()) {
+            Cell current = queue.poll();
+
+            // Если мы достигли финишной ячейки,构руируем путь
+            if (current.XAbscissa == finish.x && current.YOrdinate == finish.y) return;
+
+            // Помечаем текущую ячейку как посещенную
+            visited.add(current);
+
+
+        }
+    }
+
+    public static int heuristic(Cell start, Cell finish){
+        return Math.abs(start.XAbscissa - finish.XAbscissa) + Math.abs(start.YOrdinate - finish.YOrdinate);
+    }*/
+
 }

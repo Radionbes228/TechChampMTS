@@ -1,98 +1,78 @@
-/*
 package result;
 
+import java.util.Scanner;
+import java.io.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.*;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.HashSet;
 import java.util.Set;
-
+import java.util.concurrent.TimeUnit;
 public class RobotResult1 {
     static int sideWorldReversSide = 0;
     static int xAbscissa = 15;
     static int yOrdinate = 0;
 
+    static int delay = 20;
+
     static Set<Cell> typeCell = new HashSet<>();
 
     static ConnectRobot connectRobot = new ConnectRobot();
-    static ConnectSensorData connectSensorData = new ConnectSensorData();
+    static SensorData sensorData;
 
     static int[][] matrix = new int[16][16];
 
-    public static void main(String[] args) throws java.lang.Exception{
+    public static void main(String[] args) throws java.lang.Exception {
 
-        SensorData sensorData;
         while (typeCell.size() <= 255) {
-            sensorData = connectSensorData.getSensorData();
-            if (isRevers(sensorData)) {
-                createCell(isCellType(sensorData));
+            sensorData = ConnectSensorData.getSensorData();
+            int actualType = isActualCellType(sensorData);
+            createCell(actualType);
 
-                if (sideWorldReversSide == 3) sideWorldReversSide = 1;
-                else if (sideWorldReversSide == 2) sideWorldReversSide = 0;
-                else if (sideWorldReversSide == 1) sideWorldReversSide = 3;
-                else if (sideWorldReversSide == 0) sideWorldReversSide = 2;
-
+            if (actualType == 12) {
+                sideWorldReversSide = (sideWorldReversSide + 2) % 4;
                 connectRobot.right();
                 connectRobot.right();
                 connectRobot.forward();
-
-                setPosition();
-            } else if (isLeft(sensorData)) {
-                createCell(isCellType(sensorData));
-
-                if (sideWorldReversSide <= 3 && sideWorldReversSide >= 1) sideWorldReversSide--;
-                else if (sideWorldReversSide == 0) sideWorldReversSide = 3;
+            } else if (actualType == 0 || (actualType >= 2 && actualType <= 4) || actualType == 7) {
+                sideWorldReversSide = (sideWorldReversSide - 1 + 4) % 4;
                 connectRobot.left();
                 connectRobot.forward();
-
-                setPosition();
-            } else if (isForward(sensorData)) {
-                createCell(isCellType(sensorData));
-
+            } else if (actualType == 14 || actualType == 1 || actualType == 9 || actualType == 5) {
                 connectRobot.forward();
-
-                setPosition();
-            } else if (isRight(sensorData)) {
-                createCell(isCellType(sensorData));
-
-                if (sideWorldReversSide >= 0 && sideWorldReversSide <= 2) sideWorldReversSide++;
-                else if (sideWorldReversSide == 3) sideWorldReversSide = 0;
+            } else if (actualType == 8 || actualType == 13) {
+                sideWorldReversSide = (sideWorldReversSide + 1) % 4;
                 connectRobot.right();
                 connectRobot.forward();
-
-                setPosition();
             }
+            setPosition();
         }
+
         for (Cell cell : typeCell) {
             matrix[cell.XAbscissa][cell.YOrdinate] = cell.type;
         }
-        sendMatrix(matrix);
+        connectRobot.sendMatrix();
     }
 
-    public static void createCell(int cellType) {
-        short existingCell = (short) typeCell.stream()
-                .filter(cell -> cell.XAbscissa == xAbscissa && cell.YOrdinate == yOrdinate)
-                .count();
-        if (existingCell == 0) {
-            Cell cell = new Cell();
-            cell.isBeen = true;
-            cell.type = getCellType(cellType);
-            cell.YOrdinate = yOrdinate;
-            cell.XAbscissa = xAbscissa;
-            typeCell.add(cell);
-        }
-    }
     public static void setPosition() {
         if (sideWorldReversSide == 0) xAbscissa--;
         else if (sideWorldReversSide == 1) yOrdinate++;
         else if (sideWorldReversSide == 3) yOrdinate--;
         else xAbscissa++;
+    }
+
+    public static void createCell(int cellType) {
+        Cell existingCell = typeCell.stream()
+                .filter(cell -> cell.XAbscissa == xAbscissa && cell.YOrdinate == yOrdinate)
+                .findFirst()
+                .orElse(null);
+        if (existingCell == null) {
+            Cell cell = new Cell(xAbscissa, yOrdinate, getCellType(cellType));
+            typeCell.add(cell);
+        }
     }
 
     public static int getCellType(int actualType) {
@@ -110,7 +90,7 @@ public class RobotResult1 {
                 if (sideWorldReversSide == 1) return actualType + 1;
                 else if (actualType == 1) return actualType + sideWorldReversSide;
                 else return actualType - 1;
-            }else if (actualType == 0) return 0;
+            } else if (actualType == 0) return 0;
             else return actualType;
         } else if (sideWorldReversSide == 2) {
             if (actualType >= 11 && actualType <= 14) {
@@ -123,111 +103,32 @@ public class RobotResult1 {
             } else return actualType;
         } else return actualType;
     }
-    public static int isCellType(SensorData sensorData) {
-        if (isWall15(sensorData)) return 15;
-        else if (isWall14(sensorData)) return 14;
-        else if (isWall13(sensorData)) return 13;
-        else if (isWall12(sensorData)) return 12;
-        else if (isWall11(sensorData)) return 11;
-        else if (isWall10(sensorData)) return 10;
-        else if (isWall9(sensorData)) return 9;
-        else if (isWall8(sensorData)) return 8;
-        else if (isWall7(sensorData)) return 7;
-        else if (isWall6(sensorData)) return 6;
-        else if (isWall5(sensorData)) return 5;
-        else if (isWall4(sensorData)) return 4;
-        else if (isWall3(sensorData)) return 3;
-        else if (isWall2(sensorData)) return 2;
-        else if (isWall1(sensorData)) return 1;
-        else return 0;
-    }
 
-    private static void sendMatrix(int[][] matrix) {
-        connectRobot.sendMatrix(matrix);
-    }
-    private static boolean isRevers(SensorData sensorData) {
-        return (sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL) && (sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL) && (sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL);
-    }
-    private static boolean isRight(SensorData sensorData) {
-        return (sensorData.front_distance < SensorData.DISTANCE_OPEN_CELL && sensorData.left_side_distance < SensorData.DISTANCE_OPEN_CELL);
-    }
-    private static boolean isLeft(SensorData sensorData) {
-        if ((sensorData.front_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.front_distance < SensorData.DISTANCE_OPEN_CELL)
-                && (sensorData.left_side_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.left_side_distance < SensorData.DISTANCE_OPEN_CELL)
-                && (sensorData.right_side_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.right_side_distance < SensorData.DISTANCE_OPEN_CELL)) {
-            return true;
-        } else if ((sensorData.front_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.front_distance < SensorData.DISTANCE_OPEN_CELL)
-                && (sensorData.left_side_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.left_side_distance < SensorData.DISTANCE_OPEN_CELL)) {
-            return true;
-        } else if ((sensorData.right_side_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.right_side_distance < SensorData.DISTANCE_OPEN_CELL)
-                && (sensorData.left_side_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.left_side_distance < SensorData.DISTANCE_OPEN_CELL)) {
-            return true;
-        } else
-            return sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isForward(SensorData sensorData) {
-        if (sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL) {
-            return true;
-        } else
-            return (sensorData.front_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.front_distance < SensorData.DISTANCE_OPEN_CELL)
-                    && (sensorData.right_side_distance > SensorData.DISTANCE_NEAREST_CELL && sensorData.right_side_distance < SensorData.DISTANCE_OPEN_CELL);
-    }
+    private static int isActualCellType(SensorData sensorData) {
+        boolean[] walls = new boolean[4];
+        walls[0] = sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL;
+        walls[1] = sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL;
+        walls[2] = sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL;
+        walls[3] = sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
 
-    private static boolean isWall1(SensorData sensorData) {
-        return (sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL);
-    }
-    private static boolean isWall2(SensorData sensorData) {
-        return (sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL);
-    }
-    private static boolean isWall3(SensorData sensorData) {
-        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall4(SensorData sensorData) {
-        return sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall5(SensorData sensorData) {
-        return sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall6(SensorData sensorData) {
-        return (sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL);
-    }
-    private static boolean isWall7(SensorData sensorData) {
-        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall8(SensorData sensorData) {
-        return sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall9(SensorData sensorData) {
-        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall10(SensorData sensorData) {
-        return sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall11(SensorData sensorData) {
-        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall12(SensorData sensorData) {
-        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall13(SensorData sensorData) {
-        return sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall14(SensorData sensorData) {
-        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
-    }
-    private static boolean isWall15(SensorData sensorData) {
-        return sensorData.right_side_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.left_side_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.front_distance < SensorData.DISTANCE_NEAREST_CELL
-                && sensorData.back_distance < SensorData.DISTANCE_NEAREST_CELL;
+        int type = 0;
+        if (walls[0] && walls[1] && walls[2] && walls[3]) type = 15;
+        else if (walls[1] && walls[2] && walls[3]) type = 14;
+        else if (walls[0] && walls[1] && walls[3]) type = 13;
+        else if (walls[0] && walls[1] && walls[2]) type = 12;
+        else if (walls[0] && walls[2] && walls[3]) type = 11;
+        else if (walls[0] && walls[3]) type = 10;
+        else if (walls[1] && walls[2]) type = 9;
+        else if (walls[0] && walls[1]) type = 8;
+        else if (walls[0] && walls[2]) type = 7;
+        else if (walls[2] && walls[3]) type = 6;
+        else if (walls[1] && walls[3]) type = 5;
+        else if (walls[3]) type = 4;
+        else if (walls[2]) type = 3;
+        else if (walls[0]) type = 2;
+        else if (walls[1]) type = 1;
+
+        return type;
     }
 
     public static class ConnectRobot {
@@ -238,58 +139,60 @@ public class RobotResult1 {
         private final static String LEFT = "/robot-cells/left";
         private final static String SEND_MATRIX = "/matrix/send";
 
-        public HttpClient getHttpClient() {
-            return HttpClient.newHttpClient();
-        }
+        private static final OkHttpClient client;
 
-        public void right() {
-            HttpClient client = getHttpClient();
-            HttpRequest request = createRequestMovePOST_notBody(RIGHT);
-            try {
-                sendRequest_notResponseBody(client, request);
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public void left() {
-            HttpClient client = getHttpClient();
-            HttpRequest request = createRequestMovePOST_notBody(LEFT);
-            try {
-                sendRequest_notResponseBody(client, request);
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public void forward() {
-            HttpClient client = getHttpClient();
-            HttpRequest request = createRequestMovePOST_notBody(FORWARD);
-            try {
-                sendRequest_notResponseBody(client, request);
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public void sendMatrix(int[][] matrix) {
-            HttpClient client = getHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(URL_ROBOT + SEND_MATRIX + "?token=" + TOKEN))
-                    .header("Content-Type", "application/json;")
-                    .POST(HttpRequest.BodyPublishers.ofString(toJson(matrix)))
+        static {
+            client = new OkHttpClient.Builder()
+                    .connectionPool(new ConnectionPool(20, 10, TimeUnit.MINUTES))
                     .build();
-            try {
-                System.out.println(client.send(request, HttpResponse.BodyHandlers.ofString()).body());
-            } catch (IOException | InterruptedException e) {
+        }
+
+        public OkHttpClient getOkHttpClient() {
+            return client;
+        }
+
+        public void right() throws IOException, InterruptedException {
+            requestSend(RIGHT);
+            Thread.sleep(delay);
+        }
+
+        public void left() throws IOException, InterruptedException {
+            requestSend(LEFT);
+            Thread.sleep(delay);
+        }
+
+        public void forward() throws IOException, InterruptedException {
+            requestSend(FORWARD);
+            Thread.sleep(delay);
+        }
+
+        private void requestSend(String action) throws IOException {
+            Request request = createRequestMovePOST_notBody(action);
+            Response response = client.newCall(request).execute();
+            response.close();
+        }
+
+        public Request createRequestMovePOST_notBody(String requestEndpoint) {
+            return new Request.Builder()
+                    .url(URL_ROBOT + requestEndpoint + "?token=" + TOKEN)
+                    .post(RequestBody.create(new byte[0]))
+                    .build();
+        }
+
+        public void sendMatrix() throws IOException {
+            Request request = createRequestMovePOST(SEND_MATRIX);
+            try (Response response = client.newCall(request).execute()) {
+                assert response.body() != null;
+                System.out.println(response.body().string());
+            } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        public HttpRequest createRequestMovePOST_notBody(String requestEndpoint) {
-            return HttpRequest.newBuilder()
-                    .uri(URI.create(URL_ROBOT + requestEndpoint + "?token=" + TOKEN))
-                    .POST(HttpRequest.BodyPublishers.noBody())
+        public Request createRequestMovePOST(String requestEndpoint) {
+            return new Request.Builder()
+                    .url(URL_ROBOT + requestEndpoint + "?token=" + TOKEN)
+                    .post(RequestBody.create(toJson(matrix), MediaType.parse("application/json; charset=utf-8")))
                     .build();
         }
 
@@ -301,73 +204,64 @@ public class RobotResult1 {
                 throw new RuntimeException(e);
             }
         }
-
-        public void sendRequest_notResponseBody(HttpClient client, HttpRequest request) throws IOException, InterruptedException {
-            client.send(request, HttpResponse.BodyHandlers.ofString());
-        }
-
-        public HttpResponse<String> sendRequest(HttpClient client, HttpRequest request) throws IOException, InterruptedException {
-            return client.send(request, HttpResponse.BodyHandlers.ofString());
-        }
     }
+
     public static class ConnectSensorData {
         private static final String SENSOR_DATA_ENDPOINT = "/robot-cells/sensor-data";
-        private static final ConnectRobot connectRobot = new ConnectRobot();
+        private static final OkHttpClient client = ConnectRobot.client;
+        private static final ObjectMapper objectMapper = new ObjectMapper();
 
-        public SensorData getSensorData() {
-            HttpClient client = connectRobot.getHttpClient();
-            HttpRequest request = createRequestMoveGET(SENSOR_DATA_ENDPOINT);
-            HttpResponse<String> response;
-            try {
-                response = connectRobot.sendRequest(client, request);
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e.getMessage());
-            }
-
-            return new SensorData(
-                    getSensorValue(response, "front_distance"),
-                    getSensorValue(response, "right_side_distance"),
-                    getSensorValue(response, "left_side_distance"),
-                    getSensorValue(response, "back_distance"),
-                    getSensorValue(response, "left_45_distance"),
-                    getSensorValue(response, "right_45_distance"),
-                    getSensorValue(response, "rotation_pitch"),
-                    getSensorValue(response, "rotation_yaw"),
-                    getSensorValue(response, "rotation_roll"),
-                    getSensorValue(response, "down_x_offset"),
-                    getSensorValue(response, "down_y_offset")
-            );
-        }
-
-        public HttpRequest createRequestMoveGET(String requestEndpoint) {
-            return HttpRequest.newBuilder()
-                    .uri(URI.create(ConnectRobot.URL_ROBOT + requestEndpoint + "?token=" + ConnectRobot.TOKEN))
-                    .GET()
+        public static Request createRequestMoveGET(String requestEndpoint) {
+            return new Request.Builder()
+                    .url(ConnectRobot.URL_ROBOT + requestEndpoint + "?token=" + ConnectRobot.TOKEN)
+                    .get()
                     .build();
         }
 
-        public Float getSensorValue(HttpResponse<String> response, String param) {
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode jsonNode;
-            try {
-                jsonNode = objectMapper.readTree(response.body());
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
+        public static SensorData getSensorData() throws InterruptedException {
+            Thread.sleep(delay);
+            try (Response response = client.newCall(createRequestMoveGET(SENSOR_DATA_ENDPOINT)).execute()) {
+                assert response.body() != null;
+                JsonNode jsonNode = objectMapper.readTree(response.body().string());
+
+                return new SensorData(
+                        getSensorValue(jsonNode, "front_distance"),
+                        getSensorValue(jsonNode, "right_side_distance"),
+                        getSensorValue(jsonNode, "left_side_distance"),
+                        getSensorValue(jsonNode, "back_distance"),
+                        getSensorValue(jsonNode, "left_45_distance"),
+                        getSensorValue(jsonNode, "right_45_distance"),
+                        getSensorValue(jsonNode, "rotation_pitch"),
+                        getSensorValue(jsonNode, "rotation_yaw"),
+                        getSensorValue(jsonNode, "rotation_roll"),
+                        getSensorValue(jsonNode, "down_x_offset"),
+                        getSensorValue(jsonNode, "down_y_offset")
+                );
+            } catch (IOException e) {
+                throw new RuntimeException(e.getMessage());
             }
+        }
+
+        public static Float getSensorValue(JsonNode jsonNode, String param) {
             return jsonNode.get(param).floatValue();
         }
     }
-    public record SensorData(Float front_distance, Float right_side_distance, Float left_side_distance,
-                             Float back_distance, Float left_45_distance, Float right_45_distance, Float rotation_pitch,
-                             Float rotation_yaw, Float rotation_roll, Float down_x_offset, Float down_y_offset) {
-        public static final Float DISTANCE_NEAREST_CELL = 65F;
-        public static final Float DISTANCE_OPEN_CELL = 2000F;
+
+    public record SensorData(float front_distance, float right_side_distance, float left_side_distance,
+                             float back_distance, float left_45_distance, float right_45_distance, float rotation_pitch,
+                             float rotation_yaw, float rotation_roll, float down_x_offset, float down_y_offset) {
+        public static final float DISTANCE_NEAREST_CELL = 70F;
     }
+
     public static class Cell {
-        public boolean isBeen = false;
         public int XAbscissa;
         public int YOrdinate;
         public int type;
+
+        public Cell(int XAbscissa, int YOrdinate, int type) {
+            this.XAbscissa = XAbscissa;
+            this.YOrdinate = YOrdinate;
+            this.type = type;
+        }
     }
 }
-*/
