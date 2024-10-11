@@ -13,10 +13,12 @@ import java.util.concurrent.TimeUnit;
 public class Robot2Rresult {
     static int sideWorldReversSide = 0;
 
+    static List<Cell> stepToFinishRes = new LinkedList<>();
+
     static int xAbscissa = 15;
     static int yOrdinate = 0;
 
-    static int xAbscissaParent = 15;
+    static int xAbscissaParent = 20;
     static int yOrdinateParent = 0;
 
     static int delayDefault = 20;
@@ -29,9 +31,6 @@ public class Robot2Rresult {
         finishMatrix.add(new FinishCell(7, 8));
         finishMatrix.add(new FinishCell(8, 7));
     }
-
-    static List<Action> stepToFinish = new LinkedList<>();
-    static List<Cell> stopList = new ArrayList<>();
 
     static boolean isFindFinish = false;
 
@@ -50,26 +49,20 @@ public class Robot2Rresult {
         sensorData = ConnectSensorData.getSensorData();
         int actualType = isActualCellType(sensorData);
 
-        if (actualType == 12) {
-            cell.action.push(Action.FORWARD);
-            cell.action.push(Action.RIGHT);
-            cell.action.push(Action.RIGHT);
-            sideWorldReversSide = (sideWorldReversSide + 2) % 4;
-            connectRobot.right();
-            connectRobot.right();
-            connectRobot.forward();
-        } else if (actualType == 0 || (actualType >= 2 && actualType <= 4) || actualType == 7) {
-            cell.action.push(Action.FORWARD);
-            cell.action.push(Action.LEFT);
+        if (actualType == 0 || (actualType >= 2 && actualType <= 4) || actualType == 7) {
+            if (isFork(actualType)) cell.isFork = true;
+            cell.actions.add(Action.FORWARD);
+            cell.actions.add(Action.LEFT);
             sideWorldReversSide = (sideWorldReversSide - 1 + 4) % 4;
             connectRobot.left();
             connectRobot.forward();
         } else if (actualType == 14 || actualType == 1 || actualType == 9 || actualType == 5) {
-            cell.action.push(Action.FORWARD);
+            if (isFork(actualType)) cell.isFork = true;
+            cell.actions.add(Action.FORWARD);
             connectRobot.forward();
         } else if (actualType == 8 || actualType == 13) {
-            cell.action.push(Action.FORWARD);
-            cell.action.push(Action.RIGHT);
+            cell.actions.add(Action.FORWARD);
+            cell.actions.add(Action.RIGHT);
             sideWorldReversSide = (sideWorldReversSide + 1) % 4;
             connectRobot.right();
             connectRobot.forward();
@@ -78,8 +71,6 @@ public class Robot2Rresult {
         path.add(cell);
         xAbscissaParent = cell.XAbscissa;
         yOrdinateParent = cell.YOrdinate;
-
-
 
         while (!isFindFinish) {
             if (isWas(xAbscissa, yOrdinate)){
@@ -108,6 +99,7 @@ public class Robot2Rresult {
             }
             else moveRobot();
         }
+        buildPath();
         moveRobotToFinish();
     }
 
@@ -119,27 +111,23 @@ public class Robot2Rresult {
         cell.YOrdinate = yOrdinate;
         if (actualType == 12) {
             sideWorldReversSide = (sideWorldReversSide + 2) % 4;
-            cell.action.push(Action.FORWARD);
-            cell.action.push(Action.RIGHT);
-            cell.action.push(Action.RIGHT);
-            cell.isDeadEnd = true;
             connectRobot.right();
             connectRobot.right();
             connectRobot.forward();
         } else if (actualType == 0 || (actualType >= 2 && actualType <= 4) || actualType == 7) {
             if (isFork(actualType)) cell.isFork = true;
-            cell.action.push(Action.FORWARD);
-            cell.action.push(Action.LEFT);
+            cell.actions.add(Action.FORWARD);
+            cell.actions.add(Action.LEFT);
             sideWorldReversSide = (sideWorldReversSide - 1 + 4) % 4;
             connectRobot.left();
             connectRobot.forward();
         } else if (actualType == 14 || actualType == 1 || actualType == 9 || actualType == 5) {
             if (isFork(actualType)) cell.isFork = true;
-            cell.action.push(Action.FORWARD);
+            cell.actions.add(Action.FORWARD);
             connectRobot.forward();
         } else if (actualType == 8 || actualType == 13) {
-            cell.action.push(Action.FORWARD);
-            cell.action.push(Action.RIGHT);
+            cell.actions.add(Action.FORWARD);
+            cell.actions.add(Action.RIGHT);
             sideWorldReversSide = (sideWorldReversSide + 1) % 4;
             connectRobot.right();
             connectRobot.forward();
@@ -156,15 +144,11 @@ public class Robot2Rresult {
         return path.stream().anyMatch(cell -> cell.XAbscissa == x && cell.YOrdinate == y);
     }
 
-    public static boolean isFork(int actualType){
-        return actualType >= 0 && actualType <= 3;
-    }
-
     public static void isFinish() throws IOException, InterruptedException {
         for (FinishCell cell: finishMatrix){
             if (path.stream().anyMatch(el -> el.XAbscissa == cell.x && el.YOrdinate == cell.y)){
-                isFindFinish = true;
                 sideWorldReversSide = 0;
+                isFindFinish = true;
                 xAbscissa = 15;
                 yOrdinate = 0;
                 Thread.sleep(3000);
@@ -183,31 +167,143 @@ public class Robot2Rresult {
     }
 
     public static void moveRobotToFinish() throws IOException, InterruptedException {
+        Collections.reverse(stepToFinishRes);
+        Cell cell = stepToFinishRes.get(0);
+        for (int i = 0; i <= 1; i++) {
+            while (true){
+                Cell child = findChild(cell);
+                int x = child.XAbscissa - cell.XAbscissa;
+                int y = child.YOrdinate - cell.YOrdinate;
+                isOrientation(x, y);
+                int[][] isSide = getOrientation();
+                if (stepToFinishRes.get(stepToFinishRes.size() -1).equals(cell.parent)) {
+                    if (isSide[0][0] == x && isSide[0][1] == y){
+                        connectRobot.left();
+                        connectRobot.forward();
+                    }else if (isSide[1][0] == x && isSide[1][1] == y){
+                        connectRobot.forward();
+                    } else if (isSide[2][0] == x && isSide[2][1] == y) {
+                        connectRobot.right();
+                        connectRobot.left();
+                    }
+                    break;
+                }
+                //дописать на основе смещения!!!
+                if (cell.isFork){
+                    if (isSide[0][0] == x && isSide[0][1] == y){
+                        connectRobot.left();
+                        connectRobot.forward();
+                    }else if (isSide[1][0] == x && isSide[1][1] == y){
+                        connectRobot.forward();
+                    } else if (isSide[2][0] == x && isSide[2][1] == y) {
+                        connectRobot.right();
+                        connectRobot.left();
+                    }
+                    break;
+                }
 
-        for (Cell cell : path) {
-            Stack<Action> step = cell.action;
-            stepToFinish.addAll(step);
-        }
-        for (int i = 0; i < 2; i++) {
-            for (Action action: stepToFinish) {
-                if (action == Action.FORWARD) {
-                    connectRobot.forward();
-                    Thread.sleep(delay);
+                Stack<Action> stack = cell.actions;
+
+                while (!stack.isEmpty()){
+                    if (sideWorldReversSide != 0){
+                        move(stack);
+                    } else {
+                        Action action = stack.pop();
+                        if (action == Action.LEFT) connectRobot.left();
+                        else if (action == Action.FORWARD) connectRobot.forward();
+                        else if (action == Action.RIGHT) connectRobot.right();
+                    }
                 }
-                else if (action == Action.RIGHT) {
-                    connectRobot.right();
-                    Thread.sleep(delay);
-                }
-                else if (action == Action.LEFT) {
-                    Thread.sleep(delay);
-                    connectRobot.left();
-                }
+                cell = child;
             }
-            connectRobot.forward();
-            Thread.sleep(1000);
-            connectRobot.restart();
         }
     }
+
+    public static Cell findChild(Cell parent){
+        Cell cell = stepToFinishRes.get(stepToFinishRes.size() - 1);
+        while (true){
+            if (cell.parent == null) return null;
+            if (cell.parent == parent){
+                return cell;
+            }
+            cell = cell.parent;
+        }
+    }
+    public static void move(Stack<Action> actions) throws IOException, InterruptedException {
+        while (!actions.isEmpty()){
+            Action action = actions.pop();
+            if (action == Action.FORWARD) connectRobot.forward();
+            else if (action == Action.RIGHT) connectRobot.right();
+            else if (action == Action.LEFT) connectRobot.left();
+        }
+    }
+
+    public static boolean isFork(int actualType){
+        return actualType >= 0 && actualType <=4;
+    }
+
+    // TODO: дописать алгоритм, не работает запоминание родителя, попробовать использовать координаты
+    public static void buildPath() {
+        Cell cell = path.get(path.size() - 1);
+        while (true) {
+            if (cell.XAbscissa == 15 && cell.YOrdinate == 0) {
+                stepToFinishRes.add(cell);
+                return;
+            }
+            stepToFinishRes.add(cell);
+            cell = cell.parent;
+        }
+    }
+
+    public static void isOrientation(int x, int y){
+        if (sideWorldReversSide == 3){
+            if (x == 1 && y == 0) sideWorldReversSide = 2;
+            else if (x == -1 && y == 0) sideWorldReversSide = 0;
+        }else if (sideWorldReversSide == 1){
+            if (x == -1 && y == 0) sideWorldReversSide = 0;
+            else if (x == 1 && y == 0) sideWorldReversSide = 2;
+        } else if (sideWorldReversSide == 2) {
+            if (x == 0 && y == 1) sideWorldReversSide = 1;
+            else if (x == 0 && y == -1) sideWorldReversSide = 3;
+        }else {
+            if (x == 0 && y == 1) sideWorldReversSide = 1;
+            else if (x == 0 && y == -1) sideWorldReversSide = 3;
+        }
+    }
+
+    public static int[][] getOrientation(){
+        int[][] result = new int[][]{{0,-1}/*left*/, {-1,0}/*top*/, {0,1}/*right*/};
+        if (sideWorldReversSide == 0) return result;
+        else if (sideWorldReversSide == 1){
+            return new int[][]{{1,0}/*left*/, {0,-1}/*top*/, {-1,0}/*right*/};
+        }else if (sideWorldReversSide == 2){
+            return new int[][]{{0,1}/*left*/, {1,0}/*top*/, {0,-1}/*right*/};
+        } else {
+            return new int[][]{{1,0}/*left*/, {0,-1}/*top*/, {-1,0}/*right*/};
+        }
+    }
+
+//    public static Stack<Action> setAction(Cell thisCell){
+//        int[][] result = getOrientation();
+//        Stack<Action> actions = new Stack<>();
+//        int offsetX = thisCell.parent.XAbscissa - thisCell.XAbscissa;
+//        int offsetY = thisCell.parent.YOrdinate - thisCell.YOrdinate;
+//
+//        if (offsetX == result[0][0] && offsetY == result[0][1]){
+//            sideWorldReversSide = (sideWorldReversSide + 1) % 4;
+//            actions.add(Action.RIGHT);
+//            actions.add(Action.FORWARD);
+//        }
+//        else if (offsetX == result[1][0] && offsetY == result[1][1]){
+//            actions.add(Action.FORWARD);
+//        }else if (offsetX == result[2][0] && offsetY == result[2][1]){
+//            actions.add(Action.LEFT);
+//            actions.add(Action.FORWARD);
+//        }
+//
+//        return actions;
+//    }
+
 
     public static void setParent(Cell cell) {
         cell.parent = path.stream().filter(el -> el.XAbscissa == xAbscissaParent && el.YOrdinate == yOrdinateParent).findFirst().orElse(null);
@@ -335,12 +431,10 @@ public class Robot2Rresult {
     public static class Cell {
         public int XAbscissa;
         public int YOrdinate;
-        public int score = 0;
-        public Stack<Action> action = new Stack<>();
         public Cell parent;
+        boolean isFork = false;
+        Stack<Action> actions= new Stack<>();
         public Cell(){}
-        boolean isFork;
-        boolean isDeadEnd;
     }
     public static class FinishCell{
         int x;
@@ -350,54 +444,8 @@ public class Robot2Rresult {
             this.x = x;
             this.y = y;
         }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            FinishCell that = (FinishCell) o;
-            return x == that.x && y == that.y;
-        }
-
-        @Override
-        public int hashCode() {
-            int result = x;
-            result = 31 * result + y;
-            return result;
-        }
     }
     public enum Action{
         FORWARD, RIGHT, LEFT
     }
-
-    /*public static void findPath(Cell start, FinishCell finish, Cell[][] grid) {
-        // Создаем очередь приоритета для хранения ячеек, которые нужно обработать
-        PriorityQueue<Cell> queue = new PriorityQueue<>();
-
-        // Создаем множество для отслеживания посещенных ячеек
-        Set<Cell> visited = new HashSet<>();
-
-        // Инициализируем стартовую ячейку
-        start.score = 0;
-        start.parent = null;
-        queue.add(start);
-
-        while (!queue.isEmpty()) {
-            Cell current = queue.poll();
-
-            // Если мы достигли финишной ячейки,构руируем путь
-            if (current.XAbscissa == finish.x && current.YOrdinate == finish.y) return;
-
-            // Помечаем текущую ячейку как посещенную
-            visited.add(current);
-
-
-        }
-    }
-
-    public static int heuristic(Cell start, Cell finish){
-        return Math.abs(start.XAbscissa - finish.XAbscissa) + Math.abs(start.YOrdinate - finish.YOrdinate);
-    }*/
-
 }
